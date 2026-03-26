@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test HashPack Connection</title>
+    <!-- Cargamos HashConnect desde un CDN para no instalar nada -->
+    <script src="https://cdn.jsdelivr.net/npm/hashconnect@3.0.8/dist/index.browser.js"></script>
+</head>
+<body>
+    <h1>Prueba de Conexión FINAI</h1>
+    <button id="btnConectar" style="padding: 15px; font-size: 20px;">
+        Conectar HashPack
+    </button>
+    <p id="status">Estado: No conectado</p>
+    <p id="cuenta">Cuenta: -</p>
+
+    <script>
+        const btn = document.getElementById('btnConectar');
+        const status = document.getElementById('status');
+        const cuenta = document.getElementById('cuenta');
+
+        // Configuración mínima
+        const appMetadata = {
+            name: "FINAI_TEST",
+            description: "Prueba de conexión",
+            icon: ""
+        };
+
+        btn.onclick = async () => {
+            const hashconnect = new HashConnect.HashConnect();
+            
+            // Inicializar
+            const initData = await hashconnect.init(appMetadata, "testnet", false);
+            
+            // Esto hace que la extensión de Chrome se abra
+            hashconnect.connectToLocalWallet();
+
+            // Escuchar el evento de conexión
+            hashconnect.pairingEvent.on((pairingData) => {
+                const accountId = pairingData.accountIds[0];
+                status.innerText = "Estado: ✅ CONECTADO";
+                status.style.color = "green";
+                cuenta.innerText = "Cuenta: " + accountId;
+                console.log("Datos de la billetera:", pairingData);
+            });
+        };
+    </script>
+</body>
+</html>
