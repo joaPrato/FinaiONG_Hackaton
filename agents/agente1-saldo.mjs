@@ -4,30 +4,46 @@ import { CONFIG } from './config.mjs';
 export async function agenteSaldo() {
   console.log('\n--- Agente 1: Monitor de saldo ---');
 
-  // OBSERVA
-  const hbar      = await getAccountBalance(CONFIG.accountId);
-  const precio    = await getHbarPriceUsd();
-  const saldoUsd  = hbar * precio;
+  try {
+    // 1. OBSERVA: Usamos CONFIG.accountId que ahora viene de HEDERA_ACCOUNT_ID
+    const hbar   = await getAccountBalance(CONFIG.accountId) || 0;
+    const precio = await getHbarPriceUsd() || 0.07; // Fallback si falla la API
+    const saldoUsd = hbar * precio;
 
-  console.log(`Saldo: ${hbar.toFixed(2)} HBAR = $${saldoUsd.toFixed(2)} USD`);
+    console.log(`Saldo: ${hbar.toFixed(2)} HBAR = $${saldoUsd.toFixed(2)} USD`);
 
-  // RAZONA Y ACTÚA
-  if (saldoUsd < CONFIG.umbralUsd) {
-    const alerta = {
-      tipo:      'ALERTA_LIQUIDEZ',
-      saldoHbar: hbar.toFixed(2),
-      saldoUsd:  saldoUsd.toFixed(2),
-      umbralUsd: CONFIG.umbralUsd,
-      deficit:   (CONFIG.umbralUsd - saldoUsd).toFixed(2),
-      mensaje:   `Saldo por debajo del umbral. Déficit: $${(CONFIG.umbralUsd - saldoUsd).toFixed(2)} USD`,
-      timestamp: new Date().toISOString()
+    // 2. RAZONA Y ACTÚA
+    // Comparamos contra el umbral que configuramos en config.mjs
+    if (saldoUsd < CONFIG.umbralUsd) {
+      const deficitVal = (CONFIG.umbralUsd - saldoUsd).toFixed(2);
+      
+      const alerta = {
+        estado:    'ALERTA',
+        tipo:      'ALERTA_LIQUIDEZ',
+        saldoHbar: hbar.toFixed(2),
+        saldoUsd:  saldoUsd.toFixed(2),
+        umbralUsd: CONFIG.umbralUsd,
+        deficit:   deficitVal,
+        mensaje:   `⚠️ Alerta de liquidez: Saldo insuficiente. Faltan $${deficitVal} USD para alcanzar el mínimo operativo.`,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('¡ATENCIÓN! Alerta emitida:', alerta.mensaje);
+      return alerta;
+    }
+
+    console.log('Saldo OK. La ONG tiene liquidez suficiente.');
+    return { 
+      estado: 'OK', 
+      saldoUsd: saldoUsd.toFixed(2),
+      mensaje: 'Fondos operativos estables.'
     };
 
-    // Acá conectás con tu backend: webhook, email, push, lo que uses
-    console.log('ALERTA EMITIDA:', alerta);
-    return { estado: 'ALERTA', ...alerta };
+  } catch (error) {
+    console.error('❌ Error crítico en Agente 1:', error.message);
+    return { 
+      estado: 'ERROR', 
+      mensaje: 'No se pudo verificar el saldo.' 
+    };
   }
-
-  console.log('Saldo OK. Sin alertas.');
-  return { estado: 'OK', saldoUsd: saldoUsd.toFixed(2) };
 }
