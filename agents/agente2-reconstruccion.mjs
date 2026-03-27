@@ -2,55 +2,75 @@ import { getTopicMessages, decodeMessage } from './mirrorNode.mjs';
 import { CONFIG } from './config.mjs';
 
 export async function agenteReconstruccion() {
-  console.log('\n--- Agente 2: Reconstrucción de DB ---');
+  console.log('\n--- Agente 2: Auditor de Anomalías y Gastos ---');
 
-  // OBSERVA: baja todo el historial del Topic
-  const mensajes = await getTopicMessages(CONFIG.topicId);
-  console.log(`Mensajes encontrados en Hedera: ${mensajes.length}`);
-
-  if (mensajes.length === 0) {
-    console.log('Topic vacío. Nada que reconstruir.');
-    return { estado: 'VACIO', registros: [] };
-  }
-
-  // RAZONA: decodifica y valida cada mensaje
-  const registros   = [];
-  const corrompidos = [];
-
-  for (const msg of mensajes) {
-    const payload = decodeMessage(msg.message);
-
-    if (!payload) {
-      corrompidos.push({ sequenceNumber: msg.sequence_number, error: 'No decodificable' });
-      continue;
+  try {
+    const mensajes = await getTopicMessages(CONFIG.topicId);
+    
+    // CASO 1: Topic totalmente vacío
+    if (!mensajes || mensajes.length === 0) {
+      console.log('ℹ️ El canal de auditoría en Hedera está vacío.');
+      return { 
+        estado: 'SISTEMA_VIRGEN', 
+        mensaje: 'La auditoría está lista pero no se encontraron registros en la blockchain.',
+        instruccion: 'Para activar al Agente 2, primero debes registrar un gasto (expense) usando el chat de la ONG.',
+        fuente: `Topic Hedera ${CONFIG.topicId}`
+      };
     }
 
-    registros.push({
-      sequenceNumber:     msg.sequence_number,
-      consensusTimestamp: msg.consensus_timestamp,
-      hash:               payload.hash,
-      movimiento:         payload.data  // tus datos financieros
-    });
+    const egresos = mensajes
+      .map(msg => decodeMessage(msg.message)?.data || decodeMessage(msg.message))
+      .filter(m => m?.type === 'expense');
+
+    // CASO 2: Hay mensajes, pero ninguno es un gasto
+    if (egresos.length === 0) {
+      return { 
+        estado: 'SIN_EGRESOS', 
+        mensaje: 'Se detectaron movimientos (ingresos/activos), pero no hay gastos (expenses) para auditar.',
+        totalMensajes: mensajes.length,
+        proximaAccion: 'Carga un gasto para calcular el promedio de anomalías.'
+      };
+    }
+
+    // CASO 3: Solo hay un gasto (no se puede promediar)
+    if (egresos.length < 2) {
+      return { 
+        estado: 'APRENDIENDO', 
+        mensaje: 'Auditoría en fase de aprendizaje. Tengo 1 solo gasto registrado.',
+        instruccion: 'Se requiere un segundo gasto para empezar a comparar desviaciones y promedios.',
+        ultimoRegistro: egresos[0]
+      };
+    }
+
+    // --- LÓGICA DE AUDITORÍA NORMAL ---
+    const ultimoGasto = egresos[0];
+    const historicoEgresos = egresos.slice(1);
+    const sumaHistorica = historicoEgresos.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const promedioHistorico = sumaHistorica / historicoEgresos.length;
+
+    const factorAnomalia = 1.5; 
+    const limitePermitido = promedioHistorico * factorAnomalia;
+
+    if (ultimoGasto.amount > limitePermitido) {
+      const desviacion = ((ultimoGasto.amount / promedioHistorico - 1) * 100).toFixed(0);
+      return {
+        estado: 'ALERTA',
+        tipo: 'GASTO_ANOMALO',
+        monto: ultimoGasto.amount.toFixed(2),
+        promedio: promedioHistorico.toFixed(2),
+        desviacion: `${desviacion}%`,
+        mensaje: `🚨 ¡Atención! Este gasto es un ${desviacion}% superior al promedio habitual.`
+      };
+    }
+
+    return {
+      estado: 'OK',
+      mensaje: 'Gastos dentro de la normalidad operativa.',
+      promedioReferencia: promedioHistorico.toFixed(2)
+    };
+
+  } catch (error) {
+    console.error('❌ Error en Agente 2:', error.message);
+    return { estado: 'ERROR', mensaje: 'Fallo en la conexión con la red de auditoría.' };
   }
-
-  // ACTÚA: reporta qué reconstruyó y qué no pudo
-  const resultado = {
-    estado:           corrompidos.length === 0 ? 'RECONSTRUCCION_COMPLETA' : 'RECONSTRUCCION_PARCIAL',
-    totalEnHedera:    mensajes.length,
-    reconstruidos:    registros.length,
-    corrompidos:      corrompidos.length,
-    registros,        // esto lo mandás a tu DB
-    corrompidos,
-    timestamp:        new Date().toISOString()
-  };
-
-  console.log(`Reconstruidos: ${registros.length} / ${mensajes.length}`);
-  if (corrompidos.length > 0) {
-    console.log('Registros no recuperables:', corrompidos);
-  }
-
-  // Acá llamás a tu backend para que reinserte los registros en PostgreSQL
-  // await db.rebuild(registros);
-
-  return resultado;
 }

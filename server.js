@@ -253,73 +253,55 @@ app.get("/api/history/by-type", async (req, res) => {
 });
 
 
-// --- ENDPOINT PARA EL AGENTE 1 DE MONITOREO DE SALDO ---
-app.get("/api/agente/check-balance", async (req, res) => {
-  console.log(" ENTRE AL ENDPOINT");
-
+// --- ENDPOINT: GUARDIÁN DE LIQUIDEZ (AGENTE 1) ---
+app.get("/api/agente/analisis-liquidez", async (req, res) => {
   try {
-    // Importación dinámica para compatibilidad con .mjs
+    // Importamos el agente de flujo de caja
     const { agenteSaldo } = await import("./agents/agente1-saldo.mjs");
     
-    // Ejecutamos la lógica del agente
-    const reporte = await agenteSaldo();
+    // Obtenemos el análisis de los últimos 30 días vs Umbral
+    const analisis = await agenteSaldo();
 
-    // Respondemos al Front-End
     res.json({
       success: true,
-      ...reporte
+      data: analisis
     });
   } catch (error) {
-    console.error("Error al ejecutar Agente de Saldo:", error);
     res.status(500).json({ 
       success: false, 
-      error: "No se pudo obtener el reporte del agente." 
+      error: "Error en el análisis de supervivencia financiera." 
     });
   }
 });
 
-app.get("/api/agente/reconstruir-db", async (req, res) => {
+
+// --- ENDPOINT: AUDITOR DE ANOMALÍAS (AGENTE 2) ---
+app.get("/api/agente/auditoria-gastos", async (req, res) => {
   try {
     const { agenteReconstruccion } = await import("./agents/agente2-reconstruccion.mjs");
     
-    // Ejecutamos la lógica de recuperación desde la Blockchain
-    const resultado = await agenteReconstruccion();
+    const auditoria = await agenteReconstruccion();
 
-    // Respondemos con el informe de lo recuperado
     res.json({
       success: true,
-      data: resultado
+      data: auditoria
     });
   } catch (error) {
-    console.error("Error en Agente de Reconstrucción:", error);
     res.status(500).json({ 
       success: false, 
-      error: "No se pudo sincronizar con la red de Hedera." 
+      error: "No se pudo ejecutar la auditoría de gastos." 
     });
   }
 });
 
-
-// --- ENDPOINT PARA EL REPORTE DE RENDICIÓN DE CUENTAS ---
-app.get("/api/agente/reporte-rendicion", async (req, res) => {
+// --- ENDPOINT: ESTRATEGA DE SOSTENIBILIDAD (AGENTE 3) ---
+app.get("/api/agente/proyeccion-sostenibilidad", async (req, res) => {
   try {
     const { agenteRendicion } = await import("./agents/agente3-rendicion.mjs");
-    
-    // Obtenemos fechas de los Query Params si existen
-    const { desde, hasta } = req.query;
-    
-    const reporte = await agenteRendicion(desde, hasta);
-    
-    res.json({
-      success: true,
-      data: reporte
-    });
+    const proyeccion = await agenteRendicion();
+    res.json({ success: true, data: proyeccion });
   } catch (error) {
-    console.error("Error en Agente 3:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Error al generar el reporte de auditoría." 
-    });
+    res.status(500).json({ success: false, error: "Error al proyectar datos." });
   }
 });
 

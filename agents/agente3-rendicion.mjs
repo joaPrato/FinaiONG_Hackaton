@@ -1,55 +1,85 @@
 import { getTopicMessages, decodeMessage } from './mirrorNode.mjs';
 import { CONFIG } from './config.mjs';
 
-export async function agenteRendicion(fechaDesde, fechaHasta) {
-  console.log('\n--- Agente 3: Reporte de rendición ---');
+export async function agenteRendicion() {
+  console.log('\n--- Agente 3: Estratega de Sostenibilidad (Tendencias) ---');
 
-  // 1. OBSERVA: Trae el historial inmutable de Hedera
-  const mensajes = await getTopicMessages(CONFIG.topicId);
-
-  // 2. RAZONA: Normaliza fechas y filtra
-  // Si no vienen fechas, usamos un rango infinito por defecto
-  const desde = fechaDesde ? new Date(fechaDesde).getTime() / 1000 : 0;
-  const hasta = fechaHasta ? new Date(fechaHasta).getTime() / 1000 : Date.now() / 1000;
-
-  const movimientos = mensajes
-    .map(msg => {
-      const payload = decodeMessage(msg.message);
-      return {
-        timestamp: Number(msg.consensus_timestamp.split('.')[0]),
-        seq:       msg.sequence_number,
-        // Si tu backend guarda los datos dentro de .data, lo extraemos; si no, usamos el payload directo
-        data:      payload?.data || payload 
+  try {
+    // 1. OBSERVA: Intentamos traer el historial de Hedera
+    const mensajes = await getTopicMessages(CONFIG.topicId);
+    
+    // CASO: No hay mensajes en el Topic
+    if (!mensajes || mensajes.length === 0) {
+      console.log('ℹ️ [Agente 3]: El historial de Hedera está vacío. Sin datos no puedo proyectar tendencias.');
+      return { 
+        estado: 'DATOS_INSUFICIENTES', 
+        mensaje: 'Blockchain vacía: Esperando los primeros registros para iniciar el análisis de sostenibilidad.',
+        tip: 'Registra donaciones (income) y gastos (expense) para ver la comparación mensual.',
+        fuente: `Topic ${CONFIG.topicId}`
       };
-    })
-    // Filtramos por fecha y que el mensaje sea válido
-    .filter(m => m.data && m.timestamp >= desde && m.timestamp <= hasta)
-    .map(m => ({ ...m.data, hedera_seq: m.seq })); // Agregamos el número de secuencia para auditoría
+    }
 
-  // Agrupa por clasificación (Ajustado a la estructura común de tus otros endpoints)
-  const ingresos = movimientos.filter(m => m?.type === 'income' || m?.classification?.base === 'ingreso');
-  const egresos  = movimientos.filter(m => m?.type === 'expense' || m?.classification?.base === 'egreso');
-  const activos  = movimientos.filter(m => m?.type === 'asset' || m?.classification?.base?.includes('activo'));
+    console.log(`✅ [Agente 3]: Analizando ${mensajes.length} registros para detectar tendencias...`);
 
-  const totalIngresos = ingresos.reduce((s, m) => s + (m.amount || m.amounts?.real || 0), 0);
-  const totalEgresos  = egresos.reduce((s, m) => s + (m.amount || m.amounts?.real || 0), 0);
+    const ahora = Date.now() / 1000;
+    const unMesSeg = 30 * 24 * 60 * 60;
 
-  // 3. ACTÚA: Produce el reporte estructurado
-  const reporte = {
-    estado: 'EXITO',
-    periodo: { desde: fechaDesde || 'Inicio', hasta: fechaHasta || 'Ahora' },
-    resumen: {
-      totalMovimientos: movimientos.length,
-      ingresos: { cantidad: ingresos.length, total: totalIngresos.toFixed(2) },
-      egresos:  { cantidad: egresos.length,  total: totalEgresos.toFixed(2)  },
-      activos:  { cantidad: activos.length },
-      balanceNeto: (totalIngresos - totalEgresos).toFixed(2)
-    },
-    detalles: movimientos, // Esto es lo que va a la tabla del Front
-    generadoEn: new Date().toISOString(),
-    fuenteDatos: `Hedera HCS Topic ${CONFIG.topicId} — Inmutable y Verificable`
-  };
+    // Función interna para agrupar montos por periodo
+    const calcularTotales = (msjs, inicio, fin) => {
+      let inc = 0, exp = 0;
+      msjs.forEach(m => {
+        const ts = Number(m.consensus_timestamp.split('.')[0]);
+        if (ts >= inicio && ts <= fin) {
+          const payload = decodeMessage(m.message)?.data || decodeMessage(m.message);
+          if (data?.type === 'income') inc += Number(data.amount || 0);
+          if (data?.type === 'expense') exp += Number(data.amount || 0);
+        }
+      });
+      return { inc, exp };
+    };
 
-  console.log('✅ Reporte generado:', reporte.resumen);
-  return reporte;
+    // Obtenemos datos del Mes Actual (A) y Mes Pasado (B)
+    const mesActual = calcularTotales(mensajes, ahora - unMesSeg, ahora);
+    const mesPasado = calcularTotales(mensajes, ahora - (unMesSeg * 2), ahora - unMesSeg);
+
+    // CASO: Hay mensajes pero no hay suficientes para comparar periodos
+    if (mesActual.inc === 0 && mesActual.exp === 0 && mesPasado.inc === 0 && mesPasado.exp === 0) {
+      console.log('ℹ️ [Agente 3]: Hay mensajes pero ninguno corresponde a ingresos o gastos en los últimos 60 días.');
+      return {
+        estado: 'SIN_MOVIMIENTOS_RECIENTES',
+        mensaje: 'Se detectaron mensajes técnicos en Hedera, pero no hay movimientos financieros recientes para comparar tendencias.'
+      };
+    }
+
+    // 2. RAZONA: Lógica de tendencias
+    const crecimientoGastos = mesPasado.exp > 0 ? ((mesActual.exp - mesPasado.exp) / mesPasado.exp) * 100 : 0;
+    const crecimientoIngresos = mesPasado.inc > 0 ? ((mesActual.inc - mesPasado.inc) / mesPasado.inc) * 100 : 0;
+
+    let recomendacion = "El flujo financiero se mantiene equilibrado.";
+    let alertaEstrategica = false;
+
+    if (crecimientoGastos > crecimientoIngresos && mesActual.exp > mesActual.inc) {
+      alertaEstrategica = true;
+      const dif = (crecimientoGastos - crecimientoIngresos).toFixed(0);
+      recomendacion = `⚠️ Sugerencia: Iniciar campaña de recaudación urgente. Los costos subieron un ${dif}% más que los ingresos.`;
+    }
+
+    // 3. ACTÚA
+    console.log('📈 [Agente 3]: Análisis de sostenibilidad completado.');
+    return {
+      estado: alertaEstrategica ? 'ALERTA_ESTRATEGICA' : 'OK',
+      analisis: {
+        ingresosMes: mesActual.inc.toFixed(2),
+        gastosMes: mesActual.exp.toFixed(2),
+        tendenciaGasto: `${crecimientoGastos.toFixed(1)}%`,
+        tendenciaIngreso: `${crecimientoIngresos.toFixed(1)}%`
+      },
+      recomendacion,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ [Agente 3 Error]:', error.message);
+    return { estado: 'ERROR', mensaje: 'Fallo en la proyección estratégica.' };
+  }
 }
