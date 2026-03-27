@@ -2,71 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 215 30% 12%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 215 30% 12%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 30% 12%;
-
-    --primary: 210 80% 42%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 162 50% 42%;
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 15% 50%;
-
-    --accent: 162 50% 42%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 210 80% 42%;
-
-    --radius: 0.75rem;
-
-    --sidebar-background: 215 35% 14%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 162 50% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 30% 20%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 215 25% 22%;
-    --sidebar-ring: 162 50% 50%;
-    --sidebar-muted: 215 20% 40%;
-
-    /* Custom tokens */
-    --income: 162 55% 42%;
-    --expense: 0 72% 55%;
-    --debt: 35 90% 55%;
-    --asset: 210 80% 50%;
-    --surface-elevated: 0 0% 100%;
-
-    font-family: 'DM Sans', system-ui, sans-serif;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --primary: 47.9 95.8% 53.1%;
+    --primary-foreground: 26 83.3% 14.1%;
+    --radius: 1rem;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
+  * { @apply border-border; }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-[#0a0a0c] text-slate-100 antialiased selection:bg-primary selection:text-black;
+    font-family: 'DM Sans', sans-serif;
   }
-
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
   }
 }
+
+/* Scrollbar personalizada dark */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e1e21; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #2d2d30; }
