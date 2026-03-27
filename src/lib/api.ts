@@ -24,84 +24,96 @@ export interface ProjectStat {
   balance: number;
 }
 
-export interface RecordResult {
-  parsed: {
-    type: string;
-    amount: number;
-    description: string;
-    category: string;
+export interface AgentResponse {
+  success: boolean;
+  data: {
+    nombre: string;
+    estado: string;
+    mensaje?: string;
+    alerta?: boolean;
+    recomendacion?: string;
+    metrica?: any;
+    analisis?: any;
+    tendencia?: any;
   };
-  hederaSequenceNumber: string;
-  transactionId: string;
 }
 
+// Función de mapeo interna para evitar errores de undefined
 function mapTransaction(item: any): Transaction {
-  const d = item.data ?? {};
+  const d = item.data || {};
   return {
-    id: String(item.sequence),
-    type: d.type,
-    amount: d.amount,
-    description: d.description,
-    category: d.category,
-    date: d.timestamp,
+    id: String(item.sequence || Math.random()),
+    type: String(d.type || "expense").toLowerCase() as any,
+    amount: Number(d.amount) || 0,
+    description: String(d.description || "Sin descripción"),
+    category: String(d.category || "General"),
+    date: d.timestamp || new Date().toISOString(),
     hederaSequence: String(item.sequence),
   };
 }
 
 export async function fetchStats(): Promise<Stats> {
   const res = await fetch(`${BASE}/api/stats`);
-  if (!res.ok) throw new Error("Failed to fetch stats");
+  if (!res.ok) throw new Error("Backend Offline");
   const json = await res.json();
-  const s = json.stats;
   
-  // Aquí es donde conectamos los nombres del BACK (con guión bajo) 
-  // con los nombres del FRONT (camelCase)
+  // IMPORTANTE: Tu back envía 'total_income', 'total_expense', etc.
+  const s = json.stats || {};
   return {
-    totalIncome: s.total_income || 0,
-    totalExpense: s.total_expense || 0,
-    totalDebt: s.total_debt || 0,
-    totalAssets: s.total_assets || 0,
+    totalIncome: Number(s.total_income) || 0,
+    totalExpense: Number(s.total_expense) || 0,
+    totalDebt: Number(s.total_debt) || 0,
+    totalAssets: Number(s.total_assets) || 0,
   };
 }
 
 export async function fetchHistory(): Promise<Transaction[]> {
   const res = await fetch(`${BASE}/api/history`);
-  if (!res.ok) throw new Error("Failed to fetch history");
+  if (!res.ok) throw new Error("Error en historial");
   const json = await res.json();
-  return (json.history ?? []).map(mapTransaction);
+  
+  // Mapeamos y damos vuelta (reverse) para que el mensaje 28 salga primero
+  return (json.history ?? []).map(mapTransaction).reverse();
 }
 
 export async function fetchHistoryByType(type: string): Promise<Transaction[]> {
   const url = type === "all" ? `${BASE}/api/history` : `${BASE}/api/history/by-type?type=${type}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch history");
   const json = await res.json();
-  return (json.history ?? []).map(mapTransaction);
+  return (json.history ?? []).map(mapTransaction).reverse();
 }
 
-export async function recordTransaction(text: string, userWallet: string): Promise<RecordResult> {
+export async function fetchStatsByProject(): Promise<ProjectStat[]> {
+  const res = await fetch(`${BASE}/api/stats/by-project`);
+  const json = await res.json();
+  return (json.by_project ?? []).map((p: any) => ({
+    project: p.project,
+    income: Number(p.total_income) || 0,
+    expense: Number(p.total_expense) || 0,
+    balance: Number(p.balance) || 0,
+  }));
+}
+
+export async function recordTransaction(text: string, userWallet: string) {
   const res = await fetch(`${BASE}/api/record`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, userWallet }),
   });
-  if (!res.ok) throw new Error("Failed to record transaction");
-  const json = await res.json();
-  return {
-    parsed: json.data,
-    hederaSequenceNumber: String(json.hedera_sequence),
-    transactionId: String(json.hedera_sequence),
-  };
+  return res.json();
 }
 
-export async function fetchStatsByProject(): Promise<ProjectStat[]> {
-  const res = await fetch(`${BASE}/api/stats/by-project`);
-  if (!res.ok) throw new Error("Failed to fetch stats by project");
-  const json = await res.json();
-  return (json.by_project ?? []).map((p: any) => ({
-    project: p.project,
-    income: p.total_income,
-    expense: p.total_expense,
-    balance: p.balance,
-  }));
+export async function fetchAgentLiquidez(): Promise<AgentResponse> {
+  const res = await fetch(`${BASE}/api/agente/analisis-liquidez`);
+  return res.json();
+}
+
+export async function fetchAgentAuditoria(): Promise<AgentResponse> {
+  const res = await fetch(`${BASE}/api/agente/auditoria-gastos`);
+  return res.json();
+}
+
+export async function fetchAgentSostenibilidad(): Promise<AgentResponse> {
+  const res = await fetch(`${BASE}/api/agente/proyeccion-sostenibilidad`);
+  return res.json();
 }

@@ -5,35 +5,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function translateCategory(cat: string): string {
+export function translateCategory(cat: any): string {
+  if (!cat || typeof cat !== 'string') return "General";
+  
+  // Normalizamos a minúsculas para el match del diccionario
+  const key = cat.toLowerCase();
+
   const dictionary: Record<string, string> = {
-    // INCOME
-    "Donation_Individual": "Donaciones Individuales",
-    "Grant_Government": "Subsidios Estatales",
-    "Event_Fundraising": "Eventos de Recaudación",
-    "Corporate_Partnership": "Convenios Corporativos",
     "income": "Ingreso",
-    
-    // EXPENSE
-    "Program_Direct_Impact": "Impacto Directo",
-    "Operational_Costs": "Gastos Operativos",
-    "Human_Resources": "Recursos Humanos",
-    "Marketing": "Marketing y Prensa",
     "expense": "Egreso",
-
-    // DEBT
-    "Supplier_Pending": "Proveedores Pendientes",
-    "Loan_Repayment": "Cuotas de Préstamos",
     "debt": "Deuda",
-
-    // ASSET
-    "Cash_Bank": "Caja y Bancos",
-    "Physical_Inventory": "Stock e Insumos",
-    "Fixed_Asset": "Bienes de Uso",
     "asset": "Activo",
-
-    "Sin_Proyecto": "Sin Categoría"
+    "donation_individual": "Donación Individual",
+    "grant_government": "Subsidio Estatal",
+    "event_fundraising": "Evento Recaudación",
+    "corporate_partnership": "Alianza Corporativa",
+    "program_direct_impact": "Impacto Directo",
+    "operational_costs": "Costos Operativos",
+    "human_resources": "Recursos Humanos",
+    "marketing": "Marketing",
+    "supplier_pending": "Proveedor Pendiente",
+    "loan_repayment": "Pago de Préstamo",
+    "cash_bank": "Caja/Banco",
+    "physical_inventory": "Inventario Físico",
+    "fixed_asset": "Activo Fijo",
+    "sin_proyecto": "Sin Clasificar"
   };
 
-  return dictionary[cat] || cat.replace(/_/g, ' ');
+  return dictionary[key] || cat.replace(/_/g, ' ');
 }
