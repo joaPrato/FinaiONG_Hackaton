@@ -53,11 +53,14 @@ export async function fetchStats(): Promise<Stats> {
   if (!res.ok) throw new Error("Failed to fetch stats");
   const json = await res.json();
   const s = json.stats;
+  
+  // Aquí es donde conectamos los nombres del BACK (con guión bajo) 
+  // con los nombres del FRONT (camelCase)
   return {
-    totalIncome: s.total_income,
-    totalExpense: s.total_expense,
-    totalDebt: s.total_debt,
-    totalAssets: s.total_assets,
+    totalIncome: s.total_income || 0,
+    totalExpense: s.total_expense || 0,
+    totalDebt: s.total_debt || 0,
+    totalAssets: s.total_assets || 0,
   };
 }
 
