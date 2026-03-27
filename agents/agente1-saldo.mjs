@@ -46,7 +46,7 @@ export async function agenteSaldo() {
     
     // Solo logueamos el resultado final
     console.log(`📊 Análisis completado: +$${ingresosMes.toFixed(2)} / -$${egresosMes.toFixed(2)}`);
-    console.log(`💡 Flujo Neto: $${flujoNetoMes.toFixed(2)} USD (Umbral: $${CONFIG.umbralUsd})`);
+    console.log(`💡 Flujo Neto: $${flujoNetoMes.toFixed(2)}  (Umbral: $${CONFIG.umbralUsd})`);
 
     if (flujoNetoMes < CONFIG.umbralUsd) {
       console.log('⚠️  ALERTA EMITIDA: Riesgo de liquidez detectado.');
