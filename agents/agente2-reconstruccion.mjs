@@ -5,25 +5,34 @@ export async function agenteReconstruccion() {
   console.log('\n--- 🕵️  AGENTE 2: AUDITOR DE ANOMALÍAS ---');
 
   try {
-    const mensajes = await getTopicMessages(CONFIG.topicId);
+    // 1. OBTENER Y REVERSAR: Para que el índice [0] sea el movimiento más reciente
+    const mensajesRaw = await getTopicMessages(CONFIG.topicId);
+    const mensajes = mensajesRaw.reverse(); 
     
     if (!mensajes || mensajes.length === 0) {
       console.log('ℹ️  Auditor: El Topic de Hedera está vacío.');
       return { estado: 'VACIO', mensaje: 'Sin datos para auditar.' };
     }
 
-    // --- LÓGICA DE BUCEO (Igual que Agente 1) ---
+    // --- LÓGICA DE BUCEO ---
     const egresos = [];
     mensajes.forEach(msg => {
       const payload = decodeMessage(msg.message);
       const data = payload?.data || payload;
 
       const procesar = (item) => { 
-        if (item?.type === 'expense') egresos.push(item); 
+        // Aseguramos que el monto sea un número para evitar errores de cálculo
+        if (item?.type === 'expense' && item.amount !== undefined) {
+          egresos.push({
+            ...item,
+            amount: Number(item.amount)
+          });
+        } 
       };
 
-      if (Array.isArray(data?.registros)) data.registros.forEach(procesar);
-      else if (data && typeof data === 'object' && data['0']) {
+      if (Array.isArray(data?.registros)) {
+        data.registros.forEach(procesar);
+      } else if (data && typeof data === 'object' && data['0']) {
         Object.values(data).forEach(v => { if (typeof v === 'object') procesar(v); });
       } else {
         procesar(data);
@@ -38,7 +47,7 @@ export async function agenteReconstruccion() {
       return { estado: 'SIN_EGRESOS', mensaje: 'Carga un gasto para iniciar la auditoría.' };
     }
 
-    // CASO 3: Solo un gasto
+    // CASO 3: Solo un gasto (Ahora egresos[0] es el más nuevo)
     if (egresos.length < 2) {
       console.log(`📊 Auditoría: Primer gasto detectado ($${egresos[0].amount}).`);
       console.log('💡 IA en aprendizaje: Necesito un segundo gasto para establecer una línea base.');
@@ -50,14 +59,17 @@ export async function agenteReconstruccion() {
     }
 
     // --- LÓGICA DE AUDITORÍA NORMAL ---
-    const ultimoGasto = egresos[0];
+    // Con el .reverse(), el index 0 es el último gasto realizado.
+    const ultimoGasto = egresos[0]; 
     const historicoEgresos = egresos.slice(1);
-    const sumaHistorica = historicoEgresos.reduce((s, e) => s + Number(e.amount || 0), 0);
+    
+    const sumaHistorica = historicoEgresos.reduce((s, e) => s + e.amount, 0);
     const promedioHistorico = sumaHistorica / historicoEgresos.length;
 
-    console.log(`⚖️  Comparando: Gasto Actual ($${ultimoGasto.amount}) vs Promedio Histórico ($${promedioHistorico.toFixed(2)})`);
+    console.log(`⚖️  Comparando Actual: $${ultimoGasto.amount} (${ultimoGasto.description})`);
+    console.log(`📊 Promedio de los ${historicoEgresos.length} gastos anteriores: $${promedioHistorico.toFixed(2)}`);
 
-    const factorAnomalia = 1.5; 
+    const factorAnomalia = 1.5; // Alerta si es 50% superior al promedio
     const limitePermitido = promedioHistorico * factorAnomalia;
 
     if (ultimoGasto.amount > limitePermitido) {
@@ -68,7 +80,8 @@ export async function agenteReconstruccion() {
         tipo: 'GASTO_ANOMALO',
         monto: ultimoGasto.amount.toFixed(2),
         promedio: promedioHistorico.toFixed(2),
-        mensaje: `Gasto inusual detectado: $${ultimoGasto.amount}`
+        desviacion: `${desviacion}%`,
+        mensaje: `🚨 Auditoría detectó un gasto inusual: $${ultimoGasto.amount} es un ${desviacion}% superior al promedio habitual.`
       };
     }
 
@@ -76,11 +89,12 @@ export async function agenteReconstruccion() {
     return {
       estado: 'OK',
       mensaje: 'Normalidad operativa.',
-      promedioReferencia: promedioHistorico.toFixed(2)
+      promedioReferencia: promedioHistorico.toFixed(2),
+      montoAnalizado: ultimoGasto.amount.toFixed(2)
     };
 
   } catch (error) {
     console.error('❌ Error en Agente 2:', error.message);
-    return { estado: 'ERROR', mensaje: error.message };
+    return { estado: 'ERROR', mensaje: 'Fallo en la conexión con la red de auditoría.' };
   }
 }
