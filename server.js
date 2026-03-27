@@ -219,11 +219,9 @@ app.get("/api/history/by-type", async (req, res) => {
     const { type } = req.query;
 
     if (!type) {
-      return res
-        .status(400)
-        .json({
-          error: "Debes proporcionar un tipo (income, expense, debt o asset)",
-        });
+      return res.status(400).json({
+        error: "Debes proporcionar un tipo (income, expense, debt o asset)",
+      });
     }
 
     const response = await axios.get(
@@ -236,7 +234,6 @@ app.get("/api/history/by-type", async (req, res) => {
           // Intentamos decodificar y parsear el JSON
           const decodedString = Buffer.from(m.message, "base64").toString();
           const jsonData = JSON.parse(decodedString);
-
           return {
             sequence: m.sequence_number,
             timestamp: m.consensus_timestamp,
@@ -269,6 +266,60 @@ app.get("/api/history/by-type", async (req, res) => {
     res
       .status(500)
       .json({ error: "Error al filtrar el historial", details: error.message });
+  }
+});
+
+// --- ENDPOINT: GUARDIÁN DE LIQUIDEZ (AGENTE 1) ---
+app.get("/api/agente/analisis-liquidez", async (req, res) => {
+  try {
+    // Importamos el agente de flujo de caja
+    const { agenteSaldo } = await import("./agents/agente1-saldo.mjs");
+
+    // Obtenemos el análisis de los últimos 30 días vs Umbral
+    const analisis = await agenteSaldo();
+
+    res.json({
+      success: true,
+      data: analisis,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error en el análisis de supervivencia financiera.",
+    });
+  }
+});
+
+// --- ENDPOINT: AUDITOR DE ANOMALÍAS (AGENTE 2) ---
+app.get("/api/agente/auditoria-gastos", async (req, res) => {
+  try {
+    const { agenteReconstruccion } =
+      await import("./agents/agente2-reconstruccion.mjs");
+
+    const auditoria = await agenteReconstruccion();
+
+    res.json({
+      success: true,
+      data: auditoria,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "No se pudo ejecutar la auditoría de gastos.",
+    });
+  }
+});
+
+// --- ENDPOINT: ESTRATEGA DE SOSTENIBILIDAD (AGENTE 3) ---
+app.get("/api/agente/proyeccion-sostenibilidad", async (req, res) => {
+  try {
+    const { agenteRendicion } = await import("./agents/agente3-rendicion.mjs");
+    const proyeccion = await agenteRendicion();
+    res.json({ success: true, data: proyeccion });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: "Error al proyectar datos." });
   }
 });
 
