@@ -1,4 +1,4 @@
-const BASE = "http://localhost:3000";
+const BASE = "https://fanai-backend.onrender.com";
 
 export interface Transaction {
   id: string;
