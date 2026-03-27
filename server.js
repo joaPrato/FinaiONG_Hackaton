@@ -135,18 +135,28 @@ app.get("/api/stats", async (req, res) => {
     const messages = response.data.messages.map((m) =>
       JSON.parse(Buffer.from(m.message, "base64").toString()),
     );
+
     const stats = {
       total_income: 0,
       total_expense: 0,
       total_debt: 0,
       total_assets: 0,
     };
+
     messages.forEach((m) => {
-      if (m.type === "income") stats.total_income += m.amount;
-      if (m.type === "expense") stats.total_expense += m.amount;
+      // Normalizamos a minúsculas para evitar errores de case-sensitive
+      const type = m.type?.toLowerCase();
+      const amount = m.amount || 0;
+
+      if (type === "income") stats.total_income += amount;
+      else if (type === "expense") stats.total_expense += amount;
+      else if (type === "debt") stats.total_debt += amount;
+      else if (type === "asset") stats.total_assets += amount;
     });
+
     res.json({ success: true, stats });
   } catch (e) {
+    console.error("Error en stats:", e);
     res.status(500).json({ error: "Error en stats" });
   }
 });
@@ -154,11 +164,11 @@ app.get("/api/stats", async (req, res) => {
 app.get("/api/stats/by-project", async (req, res) => {
   try {
     const response = await axios.get(
-      `https://testnet.mirrornode.hedera.com/api/v1/topics/${process.env.HEDERA_TOPIC_ID}/messages`
+      `https://testnet.mirrornode.hedera.com/api/v1/topics/${process.env.HEDERA_TOPIC_ID}/messages`,
     );
 
     const messages = response.data.messages.map((m) =>
-      JSON.parse(Buffer.from(m.message, "base64").toString())
+      JSON.parse(Buffer.from(m.message, "base64").toString()),
     );
 
     const projectStats = {};
@@ -179,20 +189,21 @@ app.get("/api/stats/by-project", async (req, res) => {
         };
       }
 
-      if (m.type === "income")  projectStats[project].total_income  += m.amount;
+      if (m.type === "income") projectStats[project].total_income += m.amount;
       if (m.type === "expense") projectStats[project].total_expense += m.amount;
-      if (m.type === "debt")    projectStats[project].total_debt    += m.amount;
-      if (m.type === "asset")   projectStats[project].total_assets  += m.amount;
+      if (m.type === "debt") projectStats[project].total_debt += m.amount;
+      if (m.type === "asset") projectStats[project].total_assets += m.amount;
 
       projectStats[project].balance =
-        projectStats[project].total_income - projectStats[project].total_expense;
+        projectStats[project].total_income -
+        projectStats[project].total_expense;
 
       projectStats[project].transactions += 1;
     });
 
     // Convertimos el objeto en array ordenado por balance descendente
     const result = Object.values(projectStats).sort(
-      (a, b) => b.balance - a.balance
+      (a, b) => b.balance - a.balance,
     );
 
     res.json({ success: true, by_project: result });
@@ -208,11 +219,15 @@ app.get("/api/history/by-type", async (req, res) => {
     const { type } = req.query;
 
     if (!type) {
-      return res.status(400).json({ error: "Debes proporcionar un tipo (income, expense, debt o asset)" });
+      return res
+        .status(400)
+        .json({
+          error: "Debes proporcionar un tipo (income, expense, debt o asset)",
+        });
     }
 
     const response = await axios.get(
-      `https://testnet.mirrornode.hedera.com/api/v1/topics/${process.env.HEDERA_TOPIC_ID}/messages`
+      `https://testnet.mirrornode.hedera.com/api/v1/topics/${process.env.HEDERA_TOPIC_ID}/messages`,
     );
 
     const filteredMessages = response.data.messages
@@ -221,7 +236,7 @@ app.get("/api/history/by-type", async (req, res) => {
           // Intentamos decodificar y parsear el JSON
           const decodedString = Buffer.from(m.message, "base64").toString();
           const jsonData = JSON.parse(decodedString);
-          
+
           return {
             sequence: m.sequence_number,
             timestamp: m.consensus_timestamp,
@@ -229,15 +244,18 @@ app.get("/api/history/by-type", async (req, res) => {
           };
         } catch (e) {
           // Si el mensaje está corrupto o no es JSON, devolvemos null
-          console.warn(`Mensaje corrupto saltado en secuencia: ${m.sequence_number}`);
+          console.warn(
+            `Mensaje corrupto saltado en secuencia: ${m.sequence_number}`,
+          );
           return null;
         }
       })
-      .filter((m) => 
-        m !== null &&             // 1. Que el parseo haya sido exitoso
-        m.data &&                 // 2. Que tenga el objeto data
-        m.data.type &&            // 3. Que exista el campo type
-        m.data.type.toLowerCase() === type.toLowerCase() // 4. Que coincida con el filtro
+      .filter(
+        (m) =>
+          m !== null && // 1. Que el parseo haya sido exitoso
+          m.data && // 2. Que tenga el objeto data
+          m.data.type && // 3. Que exista el campo type
+          m.data.type.toLowerCase() === type.toLowerCase(), // 4. Que coincida con el filtro
       );
 
     res.json({
@@ -248,7 +266,9 @@ app.get("/api/history/by-type", async (req, res) => {
     });
   } catch (error) {
     console.error("Error crítico en /api/history/by-type:", error.message);
-    res.status(500).json({ error: "Error al filtrar el historial", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Error al filtrar el historial", details: error.message });
   }
 });
 
